@@ -22,6 +22,7 @@ from src.analyzer import (
     get_words_by_position,
     search_words,
 )
+from src.text_extractor import normalize_latin
 
 # Configuration
 DB_PATH = Path(__file__).parent.parent / "data" / "analysis" / "word_index.sqlite"
@@ -86,6 +87,8 @@ def main():
         "Enter a Latin word:",
         placeholder="e.g., romanus, hannibal, consul"
     ).strip().lower()
+    # Normalize v→u for consistent Latin orthography
+    search_term = normalize_latin(search_term)
 
     # Show suggestions if typing
     if search_term and len(search_term) >= 2:
@@ -249,7 +252,7 @@ def main():
         )
 
         if compare_words:
-            words = [w.strip().lower() for w in compare_words.split(",") if w.strip()]
+            words = [normalize_latin(w.strip().lower()) for w in compare_words.split(",") if w.strip()]
             if words:
                 comparison_data = []
                 for word in words[:5]:  # Limit to 5 words

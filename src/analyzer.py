@@ -8,7 +8,7 @@ from collections import Counter
 from pathlib import Path
 
 from .downloader import get_book_metadata
-from .text_extractor import load_text, tokenize
+from .text_extractor import load_text, normalize_latin, tokenize
 
 
 def calculate_frequencies(text: str) -> Counter:
@@ -39,7 +39,7 @@ def extract_snippets(
 
     Args:
         text: Full text to search
-        word: Word to find (case-insensitive)
+        word: Word to find (case-insensitive, matches both u and v)
         context_chars: Characters of context on each side
         max_snippets: Maximum number of snippets to return
 
@@ -47,7 +47,9 @@ def extract_snippets(
         List of dicts with 'context' and 'position' keys
     """
     snippets = []
-    pattern = re.compile(rf'\b{re.escape(word)}\b', re.IGNORECASE)
+    # Create pattern that matches both u and v variants (for Latin orthography)
+    pattern_str = re.escape(word).replace('u', '[uv]').replace('U', '[UV]')
+    pattern = re.compile(rf'\b{pattern_str}\b', re.IGNORECASE)
 
     for match in pattern.finditer(text):
         start = max(0, match.start() - context_chars)
@@ -262,6 +264,9 @@ def get_word_frequencies(word: str, db_path: str = "data/analysis/word_index.sql
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
+    # Normalize user input: v→u and lowercase
+    normalized_word = normalize_latin(word).lower()
+
     cursor.execute("""
         SELECT b.book_id, b.title, b.sequence_index,
                COALESCE(wf.count, 0) as count,
@@ -269,7 +274,7 @@ def get_word_frequencies(word: str, db_path: str = "data/analysis/word_index.sql
         FROM books b
         LEFT JOIN word_frequencies wf ON b.book_id = wf.book_id AND wf.word = ?
         ORDER BY b.sequence_index
-    """, (word.lower(),))
+    """, (normalized_word,))
 
     results = [dict(row) for row in cursor.fetchall()]
     conn.close()
@@ -286,13 +291,16 @@ def get_word_snippets(word: str, db_path: str = "data/analysis/word_index.sqlite
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
+    # Normalize user input: v→u and lowercase
+    normalized_word = normalize_latin(word).lower()
+
     cursor.execute("""
         SELECT b.book_id, b.title, b.sequence_index, s.context, s.position_in_book
         FROM snippets s
         JOIN books b ON s.book_id = b.book_id
         WHERE s.word = ?
         ORDER BY b.sequence_index, s.position_in_book
-    """, (word.lower(),))
+    """, (normalized_word,))
 
     results = [dict(row) for row in cursor.fetchall()]
     conn.close()
@@ -342,12 +350,15 @@ def search_words(
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
+    # Normalize user input: v→u and lowercase
+    normalized_prefix = normalize_latin(prefix).lower()
+
     cursor.execute("""
         SELECT word FROM word_stats
         WHERE word LIKE ?
         ORDER BY total_count DESC
         LIMIT ?
-    """, (prefix.lower() + "%", limit))
+    """, (normalized_prefix + "%", limit))
 
     results = [row[0] for row in cursor.fetchall()]
     conn.close()

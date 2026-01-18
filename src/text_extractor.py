@@ -32,6 +32,18 @@ def normalize_diacritics(text: str) -> str:
     return text
 
 
+def normalize_v_to_u(text: str) -> str:
+    """Normalize consonantal v to u for consistent Latin orthography."""
+    return text.replace('v', 'u').replace('V', 'U')
+
+
+def normalize_latin(text: str) -> str:
+    """Apply all Latin text normalizations: diacritics and v→u."""
+    text = normalize_diacritics(text)
+    text = normalize_v_to_u(text)
+    return text
+
+
 def extract_text_from_html(html_content: str) -> str:
     """
     Extract plain text from HTML, removing markup and navigation.
@@ -66,13 +78,13 @@ def tokenize(text: str, normalize: bool = True) -> list[str]:
 
     Args:
         text: Plain text string
-        normalize: If True, normalize diacritics and lowercase
+        normalize: If True, normalize diacritics, v→u, and lowercase
 
     Returns:
         List of word tokens
     """
     if normalize:
-        text = normalize_diacritics(text)
+        text = normalize_latin(text)
         text = text.lower()
 
     words = LATIN_WORD_PATTERN.findall(text)
